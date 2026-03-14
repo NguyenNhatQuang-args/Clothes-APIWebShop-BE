@@ -1,4 +1,4 @@
-using Backend_Clothes_API.Models.DTOs;
+﻿using Backend_Clothes_API.Models.DTOs;
 using Backend_Clothes_API.Models.Entities;
 using Backend_Clothes_API.Models.Responses;
 using Backend_Clothes_API.Repositories.InterfaceRepo;
@@ -18,23 +18,36 @@ namespace Backend_Clothes_API.Services
             _logger = logger;
         }
 
+        private static ProductDto MapToDto(Product p)
+        {
+            return new ProductDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                Brand = p.Brand,
+                Sizes = p.Sizes,
+                Colors = p.Colors,
+                Price = p.Price,
+                StockQuantity = p.StockQuantity,
+                ImageUrl = p.ImageUrl,
+                AdditionalImages = p.Images.Select(img => new ProductImageDto
+                {
+                    Id = img.Id,
+                    ImageUrl = img.ImageUrl
+                }).ToList(),
+                CategoryId = p.CategoryId,
+                CategoryName = p.Category?.Name ?? "N/A",
+                CreatedAt = p.CreatedAt
+            };
+        }
+
         public async Task<ApiResponse<IEnumerable<ProductDto>>> GetAllProductsAsync(string? searchTerm = null, Guid? categoryId = null, string? sortBy = null, int page = 1, int pageSize = 10)
         {
             try
             {
                 var products = await _productRepository.GetAllAsync(searchTerm, categoryId, sortBy, page, pageSize);
-                var productDtos = products.Select(p => new ProductDto
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Description = p.Description,
-                    Price = p.Price,
-                    StockQuantity = p.StockQuantity,
-                    ImageUrl = p.ImageUrl,
-                    CategoryId = p.CategoryId,
-                    CategoryName = p.Category.Name,
-                    CreatedAt = p.CreatedAt
-                });
+                var productDtos = products.Select(MapToDto);
 
                 var totalCount = await _productRepository.GetTotalCountAsync(searchTerm, categoryId);
                 var message = $"Products retrieved successfully. Total count: {totalCount}";
@@ -58,20 +71,7 @@ namespace Backend_Clothes_API.Services
                     return ApiResponse<ProductDto>.ErrorResponse("Product not found", "No product exists with the provided ID");
                 }
 
-                var productDto = new ProductDto
-                {
-                    Id = product.Id,
-                    Name = product.Name,
-                    Description = product.Description,
-                    Price = product.Price,
-                    StockQuantity = product.StockQuantity,
-                    ImageUrl = product.ImageUrl,
-                    CategoryId = product.CategoryId,
-                    CategoryName = product.Category.Name,
-                    CreatedAt = product.CreatedAt
-                };
-
-                return ApiResponse<ProductDto>.SuccessResponse(productDto, "Product retrieved successfully");
+                return ApiResponse<ProductDto>.SuccessResponse(MapToDto(product), "Product retrieved successfully");
             }
             catch (Exception ex)
             {
@@ -84,7 +84,6 @@ namespace Backend_Clothes_API.Services
         {
             try
             {
-                // Verify category exists
                 if (!await _categoryRepository.ExistsAsync(createProductDto.CategoryId))
                 {
                     return ApiResponse<ProductDto>.ErrorResponse("Create failed", "Invalid Category ID");
@@ -95,6 +94,9 @@ namespace Backend_Clothes_API.Services
                     Id = Guid.NewGuid(),
                     Name = createProductDto.Name,
                     Description = createProductDto.Description,
+                    Brand = createProductDto.Brand,
+                    Sizes = createProductDto.Sizes,
+                    Colors = createProductDto.Colors,
                     Price = createProductDto.Price,
                     StockQuantity = createProductDto.StockQuantity,
                     ImageUrl = createProductDto.ImageUrl,
@@ -103,25 +105,26 @@ namespace Backend_Clothes_API.Services
                     UpdatedAt = DateTime.UtcNow
                 };
 
+                if (createProductDto.AdditionalImages != null && createProductDto.AdditionalImages.Any())
+                {
+                    foreach (var imgUrl in createProductDto.AdditionalImages)
+                    {
+                        product.Images.Add(new ProductImage
+                        {
+                            Id = Guid.NewGuid(),
+                            ProductId = product.Id,
+                            ImageUrl = imgUrl,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
+
                 var createdProduct = await _productRepository.CreateAsync(product);
                 
-                // Fetch again to include category name
+                // Fetch again to include category and images
                 var result = await _productRepository.GetByIdAsync(createdProduct.Id);
 
-                var productDto = new ProductDto
-                {
-                    Id = result!.Id,
-                    Name = result.Name,
-                    Description = result.Description,
-                    Price = result.Price,
-                    StockQuantity = result.StockQuantity,
-                    ImageUrl = result.ImageUrl,
-                    CategoryId = result.CategoryId,
-                    CategoryName = result.Category.Name,
-                    CreatedAt = result.CreatedAt
-                };
-
-                return ApiResponse<ProductDto>.SuccessResponse(productDto, "Product created successfully");
+                return ApiResponse<ProductDto>.SuccessResponse(MapToDto(result!), "Product created successfully");
             }
             catch (Exception ex)
             {
@@ -151,9 +154,29 @@ namespace Backend_Clothes_API.Services
 
                 if (!string.IsNullOrEmpty(updateProductDto.Name)) product.Name = updateProductDto.Name;
                 if (updateProductDto.Description != null) product.Description = updateProductDto.Description;
+                if (updateProductDto.Brand != null) product.Brand = updateProductDto.Brand;
+                if (updateProductDto.Sizes != null) product.Sizes = updateProductDto.Sizes;
+                if (updateProductDto.Colors != null) product.Colors = updateProductDto.Colors;
                 if (updateProductDto.Price.HasValue) product.Price = updateProductDto.Price.Value;
                 if (updateProductDto.StockQuantity.HasValue) product.StockQuantity = updateProductDto.StockQuantity.Value;
                 if (updateProductDto.ImageUrl != null) product.ImageUrl = updateProductDto.ImageUrl;
+
+                // Update Additional Images if provided
+                if (updateProductDto.AdditionalImages != null)
+                {
+                    // Clear existing images and add new ones (Simplified logic)
+                    product.Images.Clear();
+                    foreach (var imgUrl in updateProductDto.AdditionalImages)
+                    {
+                        product.Images.Add(new ProductImage
+                        {
+                            Id = Guid.NewGuid(),
+                            ProductId = product.Id,
+                            ImageUrl = imgUrl,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                }
                 
                 product.UpdatedAt = DateTime.UtcNow;
 

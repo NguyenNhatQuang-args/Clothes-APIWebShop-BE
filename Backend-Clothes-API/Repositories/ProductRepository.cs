@@ -18,13 +18,20 @@ namespace Backend_Clothes_API.Repositories
         {
             var query = _context.Products
                 .Include(p => p.Category)
+                .Include(p => p.Images)
                 .AsQueryable();
 
             // Search
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 searchTerm = searchTerm.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(searchTerm) || (p.Description != null && p.Description.ToLower().Contains(searchTerm)));
+                query = query.Where(p => 
+                    p.Name.ToLower().Contains(searchTerm) || 
+                    (p.Description != null && p.Description.ToLower().Contains(searchTerm)) ||
+                    (p.Brand != null && p.Brand.ToLower().Contains(searchTerm)) ||
+                    (p.Sizes != null && p.Sizes.ToLower().Contains(searchTerm)) ||
+                    (p.Colors != null && p.Colors.ToLower().Contains(searchTerm))
+                );
             }
 
             // Filter
@@ -57,7 +64,11 @@ namespace Backend_Clothes_API.Repositories
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 searchTerm = searchTerm.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(searchTerm) || (p.Description != null && p.Description.ToLower().Contains(searchTerm)));
+                query = query.Where(p => 
+                    p.Name.ToLower().Contains(searchTerm) || 
+                    (p.Description != null && p.Description.ToLower().Contains(searchTerm)) ||
+                    (p.Brand != null && p.Brand.ToLower().Contains(searchTerm))
+                );
             }
 
             if (categoryId.HasValue)
@@ -72,6 +83,7 @@ namespace Backend_Clothes_API.Repositories
         {
             return await _context.Products
                 .Include(p => p.Category)
+                .Include(p => p.Images)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 

@@ -16,6 +16,15 @@ namespace Backend_Clothes_API.Models.Entities
         [MaxLength(2000)]
         public string? Description { get; set; }
 
+        [MaxLength(100)]
+        public string? Brand { get; set; }
+
+        [MaxLength(100)]
+        public string? Sizes { get; set; } // e.g., "S,M,L,XL"
+
+        [MaxLength(100)]
+        public string? Colors { get; set; } // e.g., "Red,Blue,Black"
+
         [Required]
         [Column(TypeName = "decimal(18,2)")]
         public decimal Price { get; set; }
@@ -36,5 +45,7 @@ namespace Backend_Clothes_API.Models.Entities
         // Relationship
         [ForeignKey("CategoryId")]
         public virtual Category Category { get; set; } = null!;
+
+        public virtual ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
     }
 }
